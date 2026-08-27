@@ -45,6 +45,21 @@ service.
 
 ## Quick start
 
+### Download a release
+
+Ready-to-run packages are published on the
+[GitHub Releases page](https://github.com/tadas-subonis/webcam-settings/releases):
+
+- `WebcamSettings-Windows-x64.zip`
+- `WebcamSettings-Linux-x64.tar.gz`
+- `WebcamSettings-macOS.zip`
+- `SHA256SUMS.txt` for download verification
+
+Extract the archive for your platform and launch `webcam-settings`. The Windows
+package includes the required Qt runtime, so it can be run without installing Qt.
+
+### Run the application
+
 Run the desktop application, select a camera, and move a supported control. Changes
 are applied directly to the physical webcam and are immediately visible to other
 applications using it.
@@ -174,6 +189,10 @@ Webcam Settings is under active development. The core GUI, native control backen
 profiles, camera-user inspection, CLI, packaging, and automated tests are working.
 Bug reports, device compatibility findings, documentation improvements, and focused
 pull requests are welcome.
+
+Version tags matching `v*` are built automatically on Windows, Linux, and macOS.
+After all packages succeed, the release workflow publishes the archives and their
+SHA-256 checksums to GitHub Releases.
 
 ## Contributing
 
