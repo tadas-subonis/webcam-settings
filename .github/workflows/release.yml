@@ -71,7 +71,7 @@ jobs:
         run: ctest --test-dir build -C Release --output-on-failure -R profile-store-tests
 
       - name: Install portable application
-        run: cmake --install build --config Release --prefix package
+        run: cmake --install build --config Release --prefix "${{ github.workspace }}/package"
 
       - name: Create Windows archive
         if: runner.os == 'Windows'
