@@ -53,6 +53,7 @@ jobs:
         run: |
           python -m pip install aqtinstall
           python -m aqt install-qt "${{ matrix['qt-platform'] }}" desktop "$QT_VERSION" "${{ matrix['qt-arch'] }}" --outputdir "$RUNNER_TEMP/Qt" --modules qtmultimedia
+          echo "$RUNNER_TEMP/Qt/$QT_VERSION/${{ matrix['qt-kit'] }}/bin" >> "$GITHUB_PATH"
 
       - name: Configure
         shell: bash
