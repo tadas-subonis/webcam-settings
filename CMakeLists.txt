@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(WebcamSettings VERSION 0.1.0 LANGUAGES CXX)
+project(WebcamSettings VERSION 0.2.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -36,6 +36,7 @@ endif()
 qt_add_executable(webcam-settings WIN32 MACOSX_BUNDLE ${WEBCAM_SETTINGS_SOURCES})
 
 target_include_directories(webcam-settings PRIVATE src)
+target_compile_definitions(webcam-settings PRIVATE WEBCAM_SETTINGS_VERSION="${PROJECT_VERSION}")
 target_link_libraries(webcam-settings PRIVATE
     Qt6::Core
     Qt6::Gui
@@ -58,11 +59,12 @@ endif()
 
 qt_add_executable(webcam-settings-cli ${WEBCAM_SETTINGS_CLI_SOURCES})
 target_include_directories(webcam-settings-cli PRIVATE src)
+target_compile_definitions(webcam-settings-cli PRIVATE WEBCAM_SETTINGS_VERSION="${PROJECT_VERSION}")
 target_link_libraries(webcam-settings-cli PRIVATE Qt6::Core Qt6::Gui Qt6::Multimedia)
 
 if(WIN32)
-    target_link_libraries(webcam-settings PRIVATE strmiids ole32 oleaut32)
-    target_link_libraries(webcam-settings-cli PRIVATE strmiids ole32 oleaut32)
+    target_link_libraries(webcam-settings PRIVATE strmiids ole32 oleaut32 mfplat mf mfuuid)
+    target_link_libraries(webcam-settings-cli PRIVATE strmiids ole32 oleaut32 mfplat mf mfuuid)
     target_compile_definitions(webcam-settings PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
     target_compile_definitions(webcam-settings-cli PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
 elseif(APPLE)
@@ -107,7 +109,7 @@ if(BUILD_TESTING)
     target_include_directories(backend-smoke-tests PRIVATE src)
     target_link_libraries(backend-smoke-tests PRIVATE Qt6::Core Qt6::Gui Qt6::Multimedia Qt6::Test)
     if(WIN32)
-        target_link_libraries(backend-smoke-tests PRIVATE strmiids ole32 oleaut32)
+        target_link_libraries(backend-smoke-tests PRIVATE strmiids ole32 oleaut32 mfplat mf mfuuid)
         target_compile_definitions(backend-smoke-tests PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
     elseif(APPLE)
         target_link_libraries(backend-smoke-tests PRIVATE

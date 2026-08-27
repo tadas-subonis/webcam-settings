@@ -294,7 +294,6 @@ void MainWindow::selectCamera(const int index)
     QSettings settings(QString::fromLatin1(kSettingsOrganization), QString::fromLatin1(kSettingsApplication));
     settings.setValue(QStringLiteral("lastDeviceId"), device.id());
     rebuildControls();
-    backend_->close();
     camera_->start();
 }
 
@@ -370,7 +369,7 @@ void MainWindow::rebuildControls()
 
     emptyLabel_->setVisible(controls.isEmpty());
     if (controls.isEmpty()) {
-        emptyLabel_->setText(tr("This camera exposes no supported standard controls."));
+        emptyLabel_->setText(tr("This camera exposes no compatible controls."));
     }
 
     for (const auto &control : controls) {
@@ -405,40 +404,47 @@ void MainWindow::clearControls()
 void MainWindow::applyValue(const CameraControlValue &value, const bool reportFailure)
 {
     QString error;
-    if (!backend_->open(selectedDeviceId_, selectedDeviceName_, &error)) {
+    if (!backend_->isOpen() && !backend_->open(selectedDeviceId_, selectedDeviceName_, &error)) {
         if (reportFailure) {
             setStatus(error, true);
         }
         return;
     }
-    if (!backend_->setControl(value.id, value.value, value.automatic, &error)) {
-        backend_->close();
+    CameraControlValue accepted;
+    if (!backend_->setControl(value, &accepted, &error)) {
         if (reportFailure) {
             setStatus(error, true);
         }
         return;
     }
-    backend_->close();
+    const auto row = std::find_if(controlRows_.cbegin(), controlRows_.cend(), [&accepted](const auto *item) {
+        return item->currentValue().id == accepted.id;
+    });
+    QString name = accepted.id;
+    if (row != controlRows_.cend()) {
+        name = (*row)->controlName();
+        (*row)->setCurrentValue(accepted.value, accepted.automatic, false);
+    }
     setStatus(tr("Applied %1: %2%3")
-                  .arg(controlDisplayName(value.id))
-                  .arg(value.value)
-                  .arg(value.automatic ? tr(" (auto)") : QString()));
+                  .arg(name)
+                  .arg(accepted.value)
+                  .arg(accepted.automatic ? tr(" (auto)") : QString()));
 }
 
 void MainWindow::reapplyAll()
 {
     QString error;
-    if (!backend_->open(selectedDeviceId_, selectedDeviceName_, &error)) {
+    if (!backend_->isOpen() && !backend_->open(selectedDeviceId_, selectedDeviceName_, &error)) {
         setStatus(error, true);
         return;
     }
     int failures = 0;
     for (const auto &value : currentValues()) {
-        if (!backend_->setControl(value.id, value.value, value.automatic, &error)) {
+        CameraControlValue accepted;
+        if (!backend_->setControl(value, &accepted, &error)) {
             ++failures;
         }
     }
-    backend_->close();
     setStatus(failures == 0
                   ? tr("All camera settings reapplied.")
                   : tr("Reapply completed with %1 failed controls.").arg(failures),
@@ -533,7 +539,7 @@ QVector<CameraControlValue> MainWindow::currentValues() const
     QVector<CameraControlValue> values;
     values.reserve(controlRows_.size());
     for (const auto *row : controlRows_) {
-        values.push_back(row->currentValue());
+        if (row->canPersist()) values.push_back(row->currentValue());
     }
     return values;
 }

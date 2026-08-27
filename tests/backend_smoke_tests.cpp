@@ -33,16 +33,21 @@ private slots:
         QVERIFY2(backend->open(selected->id(), selected->description(), &error), qPrintable(error));
         const auto controls = backend->controls(&error);
         QVERIFY2(error.isEmpty(), qPrintable(error));
-        QVERIFY2(!controls.isEmpty(), "The selected camera exposed no standard controls.");
+        QVERIFY2(!controls.isEmpty(), "The selected camera exposed no compatible controls.");
 
         if (selected->description().contains(QStringLiteral("UGREEN"), Qt::CaseInsensitive)) {
             const auto zoom = std::find_if(controls.cbegin(), controls.cend(), [](const CameraControl &control) {
-                return control.id == CameraControlId::Zoom;
+                return control.id == QStringLiteral("zoom");
             });
             QVERIFY2(zoom != controls.cend(), "The UGREEN camera did not expose its expected zoom control.");
             QVERIFY(zoom->minimum <= zoom->value);
             QVERIFY(zoom->value <= zoom->maximum);
             QVERIFY(zoom->maximum > zoom->minimum);
+            CameraControlValue accepted;
+            QVERIFY2(backend->setControl({zoom->id, zoom->value, zoom->automatic},
+                                         &accepted, &error), qPrintable(error));
+            QCOMPARE(accepted.id, zoom->id);
+            QCOMPARE(accepted.value, zoom->value);
         }
     }
 };

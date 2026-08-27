@@ -64,9 +64,16 @@ bool openSelectedCamera(const QString &selector, OpenCamera *camera)
 
 QJsonObject controlJson(const CameraControl &control)
 {
+    QJsonArray options;
+    for (const auto &option : control.options) {
+        options.append(QJsonObject{{QStringLiteral("value"), option.value},
+                                   {QStringLiteral("label"), option.label}});
+    }
     return {
-        {QStringLiteral("control"), controlKey(control.id)},
+        {QStringLiteral("control"), control.id},
         {QStringLiteral("name"), control.name},
+        {QStringLiteral("category"), control.category},
+        {QStringLiteral("type"), cameraControlTypeKey(control.type)},
         {QStringLiteral("value"), control.value},
         {QStringLiteral("auto"), control.automatic},
         {QStringLiteral("supportsAuto"), control.supportsAuto},
@@ -74,6 +81,8 @@ QJsonObject controlJson(const CameraControl &control)
         {QStringLiteral("maximum"), control.maximum},
         {QStringLiteral("step"), control.normalizedStep()},
         {QStringLiteral("default"), control.defaultValue},
+        {QStringLiteral("readOnly"), control.readOnly},
+        {QStringLiteral("options"), options},
     };
 }
 
@@ -94,14 +103,18 @@ void printControls(const OpenCamera &camera, const QVector<CameraControl> &contr
 
     qout << camera.device.description() << '\n';
     for (const auto &control : controls) {
-        qout << "  " << controlKey(control.id) << '=';
+        qout << "  " << control.id << '=';
         if (control.automatic) {
             qout << "auto (current " << control.value << ')';
         } else {
-            qout << control.value;
+            qout << control.displayValue(control.value);
         }
-        qout << "  [" << control.minimum << ".." << control.maximum
-             << ", step " << control.normalizedStep() << ", default " << control.defaultValue << ']';
+        if (control.type == CameraControlType::Integer) {
+            qout << "  [" << control.minimum << ".." << control.maximum
+                 << ", step " << control.normalizedStep() << ", default " << control.defaultValue << ']';
+        } else {
+            qout << "  [" << cameraControlTypeKey(control.type) << ']';
+        }
         if (control.supportsAuto) {
             qout << "  auto-supported";
         }
@@ -114,7 +127,8 @@ QVector<CameraControlValue> valuesFrom(const QVector<CameraControl> &controls)
     QVector<CameraControlValue> values;
     values.reserve(controls.size());
     for (const auto &control : controls) {
-        values.push_back({control.id, control.value, control.automatic});
+        if (!control.readOnly && control.type != CameraControlType::Button)
+            values.push_back({control.id, control.value, control.automatic});
     }
     return values;
 }
@@ -284,8 +298,9 @@ int commandRestore(const QString &selector, const QString &path)
     }
     int failures = 0;
     for (const auto &value : values) {
-        if (!camera.backend->setControl(value.id, value.value, value.automatic, &error)) {
-            qerr << controlKey(value.id) << ": " << error << '\n';
+        CameraControlValue accepted;
+        if (!camera.backend->setControl(value, &accepted, &error)) {
+            qerr << value.id << ": " << error << '\n';
             ++failures;
         }
     }
@@ -315,18 +330,17 @@ int commandSet(const QString &selector, const QStringList &assignments)
             ++failures;
             continue;
         }
-        CameraControlId id;
-        const QString key = assignment.left(equals).trimmed();
-        if (!controlIdFromKey(key, &id)) {
-            qerr << "Unknown control “" << key << "”.\n";
-            ++failures;
-            continue;
-        }
-        const auto supported = std::find_if(controls.cbegin(), controls.cend(), [id](const auto &control) {
-            return control.id == id;
+        const QString key = normalizedControlId(assignment.left(equals));
+        const auto supported = std::find_if(controls.cbegin(), controls.cend(), [&key](const auto &control) {
+            return control.id.compare(key, Qt::CaseInsensitive) == 0;
         });
         if (supported == controls.cend()) {
             qerr << key << " is not supported by this camera.\n";
+            ++failures;
+            continue;
+        }
+        if (supported->readOnly) {
+            qerr << key << " is read-only.\n";
             ++failures;
             continue;
         }
@@ -334,7 +348,28 @@ int commandSet(const QString &selector, const QStringList &assignments)
         const QString requested = assignment.mid(equals + 1).trimmed();
         const bool automatic = requested.compare(QStringLiteral("auto"), Qt::CaseInsensitive) == 0;
         bool numberOk = false;
-        int value = automatic ? supported->value : requested.toInt(&numberOk);
+        qint64 value = automatic ? supported->value : requested.toLongLong(&numberOk);
+        if (!numberOk && supported->type == CameraControlType::Boolean) {
+            if (requested.compare(QStringLiteral("on"), Qt::CaseInsensitive) == 0
+                || requested.compare(QStringLiteral("true"), Qt::CaseInsensitive) == 0) {
+                value = 1;
+                numberOk = true;
+            } else if (requested.compare(QStringLiteral("off"), Qt::CaseInsensitive) == 0
+                       || requested.compare(QStringLiteral("false"), Qt::CaseInsensitive) == 0) {
+                value = 0;
+                numberOk = true;
+            }
+        }
+        if (!numberOk && supported->type == CameraControlType::Menu) {
+            const auto option = std::find_if(supported->options.cbegin(), supported->options.cend(),
+                                             [&requested](const auto &item) {
+                return item.label.compare(requested, Qt::CaseInsensitive) == 0;
+            });
+            if (option != supported->options.cend()) {
+                value = option->value;
+                numberOk = true;
+            }
+        }
         if (!automatic && !numberOk) {
             qerr << "Invalid value for " << key << ": “" << requested << "”.\n";
             ++failures;
@@ -346,12 +381,16 @@ int commandSet(const QString &selector, const QStringList &assignments)
             continue;
         }
         value = supported->clamped(value);
-        if (!camera.backend->setControl(id, value, automatic, &error)) {
+        CameraControlValue accepted;
+        if (!camera.backend->setControl({supported->id, value, automatic}, &accepted, &error)) {
             qerr << key << ": " << error << '\n';
             ++failures;
             continue;
         }
-        qout << key << '=' << (automatic ? QStringLiteral("auto") : QString::number(value)) << '\n';
+        qout << key << '=' << (accepted.automatic ? QStringLiteral("auto")
+                                                   : supported->displayValue(accepted.value));
+        if (!automatic && accepted.value != value) qout << "  (camera adjusted from " << value << ')';
+        qout << '\n';
     }
     return failures == 0 ? 0 : 5;
 }
@@ -361,7 +400,7 @@ int main(int argc, char *argv[])
 {
     QCoreApplication application(argc, argv);
     QCoreApplication::setApplicationName(QStringLiteral("webcam-settings-cli"));
-    QCoreApplication::setApplicationVersion(QStringLiteral("0.1.0"));
+    QCoreApplication::setApplicationVersion(QStringLiteral(WEBCAM_SETTINGS_VERSION));
 
     QCommandLineParser parser;
     parser.setApplicationDescription(QStringLiteral("Inspect, set, save, and restore physical webcam controls."));

@@ -40,10 +40,10 @@ public:
         return {};
     }
 
-    bool setControl(const CameraControlId id, int, bool, QString *error) override
+    bool setControl(const CameraControlValue &requested, CameraControlValue *, QString *error) override
     {
         setError(error, QStringLiteral("%1 is not exposed by AVFoundation on macOS.")
-                            .arg(controlDisplayName(id)));
+                            .arg(requested.id));
         return false;
     }
 

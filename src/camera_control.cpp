@@ -1,78 +1,85 @@
 #include "camera_control.h"
 
+#include <QHash>
+#include <QRegularExpression>
+
 #include <algorithm>
-#include <array>
 
 namespace {
-struct ControlName {
-    CameraControlId id;
-    const char *key;
-    const char *label;
+const QHash<QString, QString> kLegacyNames{
+    {QStringLiteral("pan"), QStringLiteral("Pan")},
+    {QStringLiteral("tilt"), QStringLiteral("Tilt")},
+    {QStringLiteral("roll"), QStringLiteral("Roll")},
+    {QStringLiteral("zoom"), QStringLiteral("Zoom")},
+    {QStringLiteral("exposure"), QStringLiteral("Exposure")},
+    {QStringLiteral("iris"), QStringLiteral("Iris")},
+    {QStringLiteral("focus"), QStringLiteral("Focus")},
+    {QStringLiteral("brightness"), QStringLiteral("Brightness")},
+    {QStringLiteral("contrast"), QStringLiteral("Contrast")},
+    {QStringLiteral("hue"), QStringLiteral("Hue")},
+    {QStringLiteral("saturation"), QStringLiteral("Saturation")},
+    {QStringLiteral("sharpness"), QStringLiteral("Sharpness")},
+    {QStringLiteral("gamma"), QStringLiteral("Gamma")},
+    {QStringLiteral("color-enable"), QStringLiteral("Color enable")},
+    {QStringLiteral("white-balance"), QStringLiteral("White balance")},
+    {QStringLiteral("backlight-compensation"), QStringLiteral("Backlight compensation")},
+    {QStringLiteral("gain"), QStringLiteral("Gain")},
 };
-
-constexpr std::array<ControlName, 17> kNames{{
-    {CameraControlId::Pan, "pan", "Pan"},
-    {CameraControlId::Tilt, "tilt", "Tilt"},
-    {CameraControlId::Roll, "roll", "Roll"},
-    {CameraControlId::Zoom, "zoom", "Zoom"},
-    {CameraControlId::Exposure, "exposure", "Exposure"},
-    {CameraControlId::Iris, "iris", "Iris"},
-    {CameraControlId::Focus, "focus", "Focus"},
-    {CameraControlId::Brightness, "brightness", "Brightness"},
-    {CameraControlId::Contrast, "contrast", "Contrast"},
-    {CameraControlId::Hue, "hue", "Hue"},
-    {CameraControlId::Saturation, "saturation", "Saturation"},
-    {CameraControlId::Sharpness, "sharpness", "Sharpness"},
-    {CameraControlId::Gamma, "gamma", "Gamma"},
-    {CameraControlId::ColorEnable, "color-enable", "Color enable"},
-    {CameraControlId::WhiteBalance, "white-balance", "White balance"},
-    {CameraControlId::BacklightCompensation, "backlight-compensation", "Backlight compensation"},
-    {CameraControlId::Gain, "gain", "Gain"},
-}};
 } // namespace
 
-int CameraControl::normalizedStep() const
+qint64 CameraControl::normalizedStep() const
 {
-    return std::max(1, step);
+    return std::max<qint64>(1, step);
 }
 
-int CameraControl::clamped(const int candidate) const
+qint64 CameraControl::clamped(const qint64 candidate) const
 {
-    const int bounded = std::clamp(candidate, minimum, maximum);
-    const int offset = bounded - minimum;
-    return minimum + (offset / normalizedStep()) * normalizedStep();
+    if (type == CameraControlType::Boolean) {
+        return candidate == 0 ? 0 : 1;
+    }
+    if (type == CameraControlType::Menu && !options.isEmpty()) {
+        const auto exact = std::find_if(options.cbegin(), options.cend(), [candidate](const auto &option) {
+            return option.value == candidate;
+        });
+        return exact == options.cend() ? options.first().value : exact->value;
+    }
+    const qint64 bounded = std::clamp(candidate, minimum, maximum);
+    return minimum + ((bounded - minimum) / normalizedStep()) * normalizedStep();
 }
 
-QString controlKey(const CameraControlId id)
+QString CameraControl::displayValue(const qint64 candidate) const
 {
-    for (const auto &entry : kNames) {
-        if (entry.id == id) {
-            return QString::fromLatin1(entry.key);
+    if (type == CameraControlType::Boolean) {
+        return candidate == 0 ? QStringLiteral("off") : QStringLiteral("on");
+    }
+    for (const auto &option : options) {
+        if (option.value == candidate) {
+            return option.label;
         }
     }
-    return {};
+    return QString::number(candidate);
 }
 
-QString controlDisplayName(const CameraControlId id)
+QString cameraControlTypeKey(const CameraControlType type)
 {
-    for (const auto &entry : kNames) {
-        if (entry.id == id) {
-            return QString::fromLatin1(entry.label);
-        }
+    switch (type) {
+    case CameraControlType::Integer: return QStringLiteral("integer");
+    case CameraControlType::Boolean: return QStringLiteral("boolean");
+    case CameraControlType::Menu: return QStringLiteral("menu");
+    case CameraControlType::Button: return QStringLiteral("button");
     }
-    return QStringLiteral("Unknown");
+    return QStringLiteral("unknown");
 }
 
-bool controlIdFromKey(const QString &key, CameraControlId *id)
+QString legacyControlDisplayName(const QString &id)
 {
-    for (const auto &entry : kNames) {
-        if (key.compare(QString::fromLatin1(entry.key), Qt::CaseInsensitive) == 0) {
-            if (id) {
-                *id = entry.id;
-            }
-            return true;
-        }
-    }
-    return false;
+    return kLegacyNames.value(id.toLower(), id);
 }
 
+QString normalizedControlId(const QString &id)
+{
+    QString result = id.trimmed().toLower();
+    result.replace(QRegularExpression(QStringLiteral("[^a-z0-9_.:-]+")), QStringLiteral("-"));
+    result.remove(QRegularExpression(QStringLiteral("^-+|-+$")));
+    return result;
+}

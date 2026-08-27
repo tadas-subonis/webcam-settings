@@ -34,8 +34,12 @@ service.
 ## Features
 
 - Native camera discovery and low-latency preview through Qt Multimedia.
+- Dynamic integer, Boolean, menu, button, standard, and vendor control discovery.
 - Hardware zoom, exposure, focus, white balance, brightness, contrast, hue,
-  saturation, sharpness, and other controls when supported by the device.
+  saturation, sharpness, and every compatible control reported by the device.
+- Windows extended camera controls for automatic framing, digital crop/window,
+  field-of-view presets, stabilization, HDR, focus priority, and supported effects.
+- Set-and-read-back verification reports the value the camera actually accepted.
 - Manual and automatic modes with immediate application.
 - Human-readable `.webcam.json` profiles for backup and repeatable restoration.
 - Optional periodic reapply for software that resets camera values.
@@ -85,14 +89,20 @@ for confirmation because terminating an application can discard unsaved work.
 
 | Platform | Native backend | Hardware controls | Camera-user detection |
 |:--|:--|:--|:--|
-| Windows 10/11 | DirectShow | `IAMCameraControl` and `IAMVideoProcAmp` | Camera privacy activity plus the running process list |
-| Linux | Video4Linux2 | Standard `VIDIOC_G/S_CTRL` controls and available auto modes | Processes holding the selected `/dev/video*` device |
+| Windows 10/11 | DirectShow + Media Foundation fallback | Standard controls plus supported `KSPROPERTYSETID_ExtendedCameraControl` features | Camera privacy activity plus the running process list |
+| Linux | Video4Linux2 + PipeWire device bridge | Full `VIDIOC_QUERY_EXT_CTRL` enumeration, including vendor/menu/Boolean controls | Processes holding the selected `/dev/video*` device |
 | macOS | AVFoundation through Qt | Camera discovery and preview; physical UVC settings are hidden | Not exposed by AVFoundation |
 
 Unsupported hardware controls are hidden rather than simulated. macOS intentionally
 offers preview without physical controls because its AVFoundation API does not expose
 the zoom, focus, or general vendor UVC settings available on iOS. On Windows, privacy activity identifies webcam capability
 use but does not reveal which physical camera was opened on a multi-camera system.
+
+Windows extended features depend on both the Windows version and camera driver.
+Digital-window crop controls only work while the driver has an active stream, as
+required by the Windows camera API. The Linux PipeWire bridge maps PipeWire camera
+nodes back to their V4L2 device when `pw-dump` is available; hardware changes still
+use V4L2 because PipeWire does not define a portable UVC-settings protocol.
 
 ## Command-line tool
 
@@ -107,13 +117,17 @@ machine-readable output is needed.
 | Inspect controls | `webcam-settings-cli controls --device UGREEN` |
 | Find camera users | `webcam-settings-cli users --device UGREEN` |
 | Change controls | `webcam-settings-cli set zoom=175 brightness=128 --device UGREEN` |
+| Set Boolean/menu controls | `webcam-settings-cli set focus-auto=on exposure-auto=1 --device UGREEN` |
 | Enable automatic modes | `webcam-settings-cli set focus=auto exposure=auto --device UGREEN` |
 | Save a profile | `webcam-settings-cli save before.webcam.json --device UGREEN` |
 | Restore a profile | `webcam-settings-cli restore before.webcam.json --device UGREEN` |
 | End a process | `webcam-settings-cli terminate 1234 --yes` |
 
-Values are validated, clamped, and aligned to the range and step advertised by the
-camera. `restore` returns a nonzero exit code if any control fails. Process
+Control IDs come from `controls`; unknown Linux controls use stable IDs such as
+`v4l2:0x009a0920`. Boolean values accept `on`/`off`, and menu values accept either
+their numeric value or displayed label. Values are validated, clamped, aligned,
+written, and read back from the device. `restore` returns a nonzero exit code if
+any control fails. Process
 termination requires `--yes`; without it, the CLI refuses the operation.
 
 <details>
@@ -212,6 +226,11 @@ This project was inspired by Patrick Belanger's MIT-licensed
 similar ideas—supported webcam controls, profiles, and periodic reapplication—to
 an independent cross-platform C++/Qt implementation. No AForge, WPF, C#, artwork,
 or binary code from the reference project is included; see [NOTICE.md](NOTICE.md).
+
+Webcamoid was reviewed as prior art for capability coverage. No Webcamoid source,
+algorithms, assets, or plugin architecture were copied. The dynamic descriptors and
+native backends here are an independent implementation based on the public Windows
+SDK, Linux V4L2 API, Qt API, and PipeWire node metadata.
 
 ## License
 

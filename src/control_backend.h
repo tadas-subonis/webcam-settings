@@ -16,8 +16,9 @@ public:
     virtual void close() = 0;
     [[nodiscard]] virtual bool isOpen() const = 0;
     [[nodiscard]] virtual QVector<CameraControl> controls(QString *error) const = 0;
-    virtual bool setControl(CameraControlId id, int value, bool automatic, QString *error) = 0;
+    virtual bool setControl(const CameraControlValue &requested,
+                            CameraControlValue *accepted,
+                            QString *error) = 0;
 };
 
 [[nodiscard]] std::unique_ptr<CameraControlBackend> createPlatformBackend();
-

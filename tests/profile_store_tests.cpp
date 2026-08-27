@@ -14,8 +14,8 @@ private slots:
         QVERIFY(directory.isValid());
         const QString path = directory.filePath(QStringLiteral("camera.webcam.json"));
         const QVector<CameraControlValue> source{
-            {CameraControlId::Zoom, 175, false},
-            {CameraControlId::Focus, 560, true},
+            {QStringLiteral("zoom"), 175, false},
+            {QStringLiteral("vendor:tracking-mode"), 3, false},
         };
 
         QString error;
@@ -27,11 +27,10 @@ private slots:
         QVERIFY2(ProfileStore::load(path, &loaded, &deviceName, &error), qPrintable(error));
         QCOMPARE(deviceName, QStringLiteral("Test Camera"));
         QCOMPARE(loaded.size(), 2);
-        QCOMPARE(loaded.at(0).id, CameraControlId::Zoom);
+        QCOMPARE(loaded.at(0).id, QStringLiteral("zoom"));
         QCOMPARE(loaded.at(0).value, 175);
         QCOMPARE(loaded.at(0).automatic, false);
-        QCOMPARE(loaded.at(1).id, CameraControlId::Focus);
-        QCOMPARE(loaded.at(1).automatic, true);
+        QCOMPARE(loaded.at(1).id, QStringLiteral("vendor:tracking-mode"));
     }
 
     void rejectsMalformedProfile()
@@ -53,14 +52,30 @@ private slots:
     void normalizesControlValues()
     {
         const CameraControl control{
-            CameraControlId::Zoom, QStringLiteral("Zoom"), 100, 400, 25, 100, 100, false, false,
+            QStringLiteral("zoom"), QStringLiteral("Zoom"), QStringLiteral("Camera"),
+            CameraControlType::Integer, 100, 400, 25, 100, 100, {}, false, false, false,
         };
         QCOMPARE(control.clamped(87), 100);
         QCOMPARE(control.clamped(174), 150);
         QCOMPARE(control.clamped(401), 400);
+
+        const CameraControl toggle{
+            QStringLiteral("vendor:tracking"), QStringLiteral("Tracking"), QStringLiteral("Vendor"),
+            CameraControlType::Boolean, 0, 1, 1, 0, 0,
+        };
+        QCOMPARE(toggle.clamped(-10), 1);
+        QCOMPARE(toggle.displayValue(0), QStringLiteral("off"));
+
+        const CameraControl menu{
+            QStringLiteral("vendor:mode"), QStringLiteral("Mode"), QStringLiteral("Vendor"),
+            CameraControlType::Menu, 0, 10, 1, 2, 2,
+            {{2, QStringLiteral("Wide")}, {7, QStringLiteral("Portrait")}},
+        };
+        QCOMPARE(menu.clamped(7), 7);
+        QCOMPARE(menu.clamped(5), 2);
+        QCOMPARE(menu.displayValue(7), QStringLiteral("Portrait"));
     }
 };
 
 QTEST_APPLESS_MAIN(ProfileStoreTests)
 #include "profile_store_tests.moc"
-

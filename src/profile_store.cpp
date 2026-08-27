@@ -24,7 +24,7 @@ bool ProfileStore::save(const QString &path,
     QJsonArray controls;
     for (const auto &value : values) {
         controls.append(QJsonObject{
-            {QStringLiteral("control"), controlKey(value.id)},
+            {QStringLiteral("control"), value.id},
             {QStringLiteral("value"), value.value},
             {QStringLiteral("auto"), value.automatic},
         });
@@ -85,14 +85,13 @@ bool ProfileStore::load(const QString &path,
             continue;
         }
         const auto object = item.toObject();
-        CameraControlId id;
-        if (!controlIdFromKey(object.value(QStringLiteral("control")).toString(), &id)
-            || !object.value(QStringLiteral("value")).isDouble()) {
+        const QString id = normalizedControlId(object.value(QStringLiteral("control")).toString());
+        if (id.isEmpty() || !object.value(QStringLiteral("value")).isDouble()) {
             continue;
         }
         parsed.push_back({
             id,
-            object.value(QStringLiteral("value")).toInt(),
+            object.value(QStringLiteral("value")).toInteger(),
             object.value(QStringLiteral("auto")).toBool(false),
         });
     }
@@ -108,4 +107,3 @@ bool ProfileStore::load(const QString &path,
     }
     return true;
 }
-
