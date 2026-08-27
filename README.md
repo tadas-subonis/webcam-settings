@@ -72,11 +72,11 @@ for confirmation because terminating an application can discard unsaved work.
 |:--|:--|:--|:--|
 | Windows 10/11 | DirectShow | `IAMCameraControl` and `IAMVideoProcAmp` | Camera privacy activity plus the running process list |
 | Linux | Video4Linux2 | Standard `VIDIOC_G/S_CTRL` controls and available auto modes | Processes holding the selected `/dev/video*` device |
-| macOS | AVFoundation | Zoom and focus when exposed by the device | Not exposed by AVFoundation |
+| macOS | AVFoundation through Qt | Camera discovery and preview; physical UVC settings are hidden | Not exposed by AVFoundation |
 
 Unsupported hardware controls are hidden rather than simulated. macOS intentionally
-has narrower coverage because AVFoundation does not provide a general interface for
-all vendor UVC controls. On Windows, privacy activity identifies webcam capability
+offers preview without physical controls because its AVFoundation API does not expose
+the zoom, focus, or general vendor UVC settings available on iOS. On Windows, privacy activity identifies webcam capability
 use but does not reveal which physical camera was opened on a multi-camera system.
 
 ## Command-line tool

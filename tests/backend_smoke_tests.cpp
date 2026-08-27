@@ -12,6 +12,9 @@ class BackendSmokeTests final : public QObject {
 private slots:
     void discoversConnectedCameraControls()
     {
+        if (qEnvironmentVariableIsSet("CI")) {
+            QSKIP("Physical-camera smoke testing is skipped on hosted CI runners.");
+        }
         const auto devices = QMediaDevices::videoInputs();
         if (devices.isEmpty()) {
             QSKIP("No camera is connected on this test machine.");
