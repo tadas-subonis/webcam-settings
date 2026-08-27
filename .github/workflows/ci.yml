@@ -61,7 +61,11 @@ jobs:
       - name: Build
         run: cmake --build build --config Release --parallel
 
-      - name: Test
-        # The backend smoke executable is compiled above, but running it needs
-        # real camera hardware and can block inside hosted Windows media APIs.
-        run: ctest --test-dir build -C Release --output-on-failure -E backend-smoke-tests
+      - name: Test portable core
+        run: ctest --test-dir build -C Release --output-on-failure -R profile-store-tests
+
+      - name: Test CLI startup
+        if: runner.os != 'Windows'
+        # Qt Multimedia startup can block on a headless Windows runner. The
+        # Windows CLI and hardware smoke test are compiled here and run locally.
+        run: ctest --test-dir build -C Release --output-on-failure -R cli-help
