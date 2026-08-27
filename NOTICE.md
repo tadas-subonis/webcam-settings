@@ -1,8 +1,8 @@
 # Acknowledgements
 
-This project is based on Patrick Belanger's
+This project was inspired by Patrick Belanger's
 [SeriousWebcamSettings](https://github.com/PatBQc/SeriousWebcamSettings),
-an MIT-licensed Windows application. The upstream project's product ideas—
+an MIT-licensed Windows application. The original project's product ideas—
 showing only supported webcam controls, saving profiles, and periodically
 reapplying settings—guided this independent C++ implementation.
 

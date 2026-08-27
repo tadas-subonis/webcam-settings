@@ -188,11 +188,11 @@ containing sensitive data in an issue or pull request.
 
 ## Upstream and acknowledgements
 
-This project is based on Patrick Belanger's MIT-licensed
-[SeriousWebcamSettings](https://github.com/PatBQc/SeriousWebcamSettings). It carries
-the original project's focus on supported webcam controls, profiles, and periodic
-reapplication into a cross-platform C++/Qt codebase. No AForge, WPF, C#, artwork,
-or binary code from upstream is included; see [NOTICE.md](NOTICE.md) for details.
+This project was inspired by Patrick Belanger's MIT-licensed
+[SeriousWebcamSettings](https://github.com/PatBQc/SeriousWebcamSettings). It brings
+similar ideas—supported webcam controls, profiles, and periodic reapplication—to
+an independent cross-platform C++/Qt implementation. No AForge, WPF, C#, artwork,
+or binary code from the reference project is included; see [NOTICE.md](NOTICE.md).
 
 ## License
 
