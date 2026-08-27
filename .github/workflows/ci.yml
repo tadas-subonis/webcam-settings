@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows
+            os: windows-latest
+            qt-platform: windows
+            qt-arch: win64_msvc2022_64
+            qt-kit: msvc2022_64
+          - name: Linux
+            os: ubuntu-24.04
+            qt-platform: linux
+            qt-arch: linux_gcc_64
+            qt-kit: gcc_64
+          - name: macOS
+            os: macos-14
+            qt-platform: mac
+            qt-arch: clang_64
+            qt-kit: macos
+
+    env:
+      QT_VERSION: 6.8.3
+      QT_QPA_PLATFORM: offscreen
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes libgl1-mesa-dev libpulse-dev libxkbcommon-x11-0
+
+      - name: Install Qt
+        shell: bash
+        run: |
+          python -m pip install aqtinstall
+          python -m aqt install-qt "${{ matrix['qt-platform'] }}" desktop "$QT_VERSION" "${{ matrix['qt-arch'] }}" --outputdir "$RUNNER_TEMP/Qt" --modules qtmultimedia
+
+      - name: Configure
+        shell: bash
+        run: cmake -S . -B build -DCMAKE_PREFIX_PATH="$RUNNER_TEMP/Qt/$QT_VERSION/${{ matrix['qt-kit'] }}"
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure

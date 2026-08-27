@@ -1,0 +1,12 @@
+/build*/
+/dist/
+/.qt/
+/.cache/
+/.deps/
+CMakeUserPresets.json
+*.user
+*.swp
+.DS_Store
+aqtinstall.log
+/artifacts/*
+!/artifacts/12-camera-user-detection.png
