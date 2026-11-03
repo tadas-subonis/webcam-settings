@@ -1,4 +1,5 @@
 #include "control_backend.h"
+#include "windows_camera_rotation.h"
 
 #include <dshow.h>
 #include <ks.h>
@@ -384,6 +385,17 @@ public:
         releaseCom(camera);
         releaseCom(image);
 
+        qint64 rotation = 0;
+        if (WindowsCameraRotation::read(deviceId_, &rotation)) {
+            found.push_back({
+                QString::fromLatin1(WindowsCameraRotation::controlId),
+                QStringLiteral("Video rotation"), QStringLiteral("Windows camera pipeline"),
+                CameraControlType::Menu, 0, 270, 90, 0, rotation,
+                {{0, QStringLiteral("No rotation")}, {90, QStringLiteral("Right 90°")},
+                 {180, QStringLiteral("180°")}, {270, QStringLiteral("Left 90°")}},
+            });
+        }
+
         for (const auto &spec : extendedSpecs()) {
             QByteArray data;
             if (!getExtended(ksControl_, spec.propertyId, &data)) continue;
@@ -479,6 +491,15 @@ public:
         if (!filter_ && !ksControl_) {
             setError(error, QStringLiteral("No camera is open."));
             return false;
+        }
+        if (requested.id == QLatin1String(WindowsCameraRotation::controlId)) {
+            if (requested.automatic) {
+                setError(error, QStringLiteral("Video rotation does not support automatic mode."));
+                return false;
+            }
+            if (!WindowsCameraRotation::write(deviceId_, requested.value, error)) return false;
+            if (accepted) *accepted = {requested.id, requested.value, false};
+            return true;
         }
         if (const auto *spec = standardSpec(requested.id)) {
             const long flags = requested.automatic ? CameraControl_Flags_Auto : CameraControl_Flags_Manual;

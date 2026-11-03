@@ -1,6 +1,9 @@
 #include "control_backend.h"
 #include "camera_usage.h"
 #include "profile_store.h"
+#ifdef Q_OS_WIN
+#include "windows_camera_rotation.h"
+#endif
 
 #include <QCameraDevice>
 #include <QCameraFormat>
@@ -410,13 +413,18 @@ int main(int argc, char *argv[])
                                            QStringLiteral("Select a camera by name or device-id substring."),
                                            QStringLiteral("selector"));
     const QCommandLineOption jsonOption(QStringLiteral("json"), QStringLiteral("Emit JSON output."));
+#ifdef Q_OS_WIN
+    const QCommandLineOption deviceIdOption(QStringLiteral("device-id"),
+        QStringLiteral("Exact device interface for the Windows rotate command."), QStringLiteral("id"));
+    parser.addOption(deviceIdOption);
+#endif
     const QCommandLineOption yesOption({QStringLiteral("y"), QStringLiteral("yes")},
                                         QStringLiteral("Confirm process termination."));
     parser.addOption(deviceOption);
     parser.addOption(jsonOption);
     parser.addOption(yesOption);
     parser.addPositionalArgument(QStringLiteral("command"),
-                                 QStringLiteral("devices, formats, controls, users, terminate, save, set, or restore"));
+                                 QStringLiteral("devices, formats, controls, users, terminate, save, set, restore, or rotate (Windows)"));
     parser.addPositionalArgument(QStringLiteral("arguments"),
                                  QStringLiteral("Command-specific path or control=value arguments"),
                                  QStringLiteral("[arguments...]"));
@@ -429,6 +437,34 @@ int main(int argc, char *argv[])
     const QString command = positional.first().toLower();
     const QString selector = parser.value(deviceOption);
     const bool json = parser.isSet(jsonOption);
+
+#ifdef Q_OS_WIN
+    if (command == QStringLiteral("rotate")) {
+        bool valid = false;
+        const qint64 degrees = positional.size() == 2 ? positional.at(1).toLongLong(&valid) : -1;
+        if (!valid || (degrees != 0 && degrees != 90 && degrees != 180 && degrees != 270)) {
+            qerr << "rotate requires 0, 90, 180, or 270 clockwise degrees.\n";
+            return 1;
+        }
+        QByteArray deviceId = parser.value(deviceIdOption).toUtf8();
+        if (deviceId.isEmpty()) {
+            const auto device = selectDevice(selector);
+            if (device.isNull()) {
+                qerr << "No matching camera was found.\n";
+                return 2;
+            }
+            deviceId = device.id();
+        }
+        QString error;
+        if (!WindowsCameraRotation::write(deviceId, degrees, &error)) {
+            qerr << error << '\n';
+            return 5;
+        }
+        qout << "Saved video rotation: " << degrees
+             << " degrees clockwise. Reopen the camera in applications to apply it.\n";
+        return 0;
+    }
+#endif
 
     if (command == QStringLiteral("devices")) {
         return commandDevices(json);

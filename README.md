@@ -37,6 +37,8 @@ service.
 - Dynamic integer, Boolean, menu, button, standard, and vendor control discovery.
 - Hardware zoom, exposure, focus, white balance, brightness, contrast, hue,
   saturation, sharpness, and every compatible control reported by the device.
+- Windows system video rotation for external USB webcams, including cameras
+  without a hardware Roll control.
 - Windows extended camera controls for automatic framing, digital crop/window,
   field-of-view presets, stabilization, HDR, focus priority, and supported effects.
 - Set-and-read-back verification reports the value the camera actually accepted.
@@ -103,6 +105,29 @@ Digital-window crop controls only work while the driver has an active stream, as
 required by the Windows camera API. The Linux PipeWire bridge maps PipeWire camera
 nodes back to their V4L2 device when `pw-dump` is available; hardware changes still
 use V4L2 because PipeWire does not define a portable UVC-settings protocol.
+
+### Rotate an external USB webcam on Windows
+
+Select the camera and use **Video rotation**: **No rotation**, **Right 90°**,
+**180°**, or **Left 90°**. This saves a machine-wide orientation override in the
+Windows camera pipeline, so compatible applications such as Google Meet can use
+the corrected video after reopening the camera. Windows may show an administrator
+prompt; cancelling it restores the dropdown to the saved value. Keep
+`webcam-settings-cli.exe` alongside the desktop application for this operation.
+
+After changing rotation, turn the camera off and on in other apps. If necessary,
+close camera apps and reconnect the webcam so Windows reloads its configuration.
+Rotation is also saved in webcam profiles. The CLI can set it from an elevated
+terminal with `webcam-settings-cli rotate 90 --device UGREEN` (clockwise degrees).
+
+This uses Windows' documented
+[`FSSensorOrientation` camera-pipeline correction](https://learn.microsoft.com/en-us/windows-hardware/drivers/stream/camera-device-orientation),
+separately from the per-user defaults in Windows Settings. It does not rotate just
+the app's preview. Applications that bypass the Windows camera pipeline may not
+honor the override. Nonzero rotation filters out compressed capture formats such
+as MJPEG and H.264; Windows can expose decoded formats instead. **No rotation**
+clears the extra pipeline rotation; it does not change a separate rotation default
+configured in Windows Settings.
 
 ## Command-line tool
 
