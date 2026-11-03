@@ -2,6 +2,9 @@
 
 #include "control_row.h"
 #include "profile_store.h"
+#ifdef Q_OS_WIN
+#include "windows_camera_rotation.h"
+#endif
 
 #include <QCamera>
 #include <QCameraDevice>
@@ -374,6 +377,13 @@ void MainWindow::rebuildControls()
 
     for (const auto &control : controls) {
         auto *row = new ControlRow(control, controlsContainer_);
+#ifdef Q_OS_WIN
+        if (control.id == QLatin1String(WindowsCameraRotation::controlId)) {
+            row->setToolTip(tr("Rotates video for apps using the Windows camera pipeline. "
+                               "Windows may ask for administrator access. Reopen the camera in other apps "
+                               "after changing this setting; reconnect the webcam if needed."));
+        }
+#endif
         row->setChangeHandler([this](const CameraControlValue &value) { applyValue(value); });
         controlsLayout_->insertWidget(controlsLayout_->count() - 1, row);
         controlRows_.push_back(row);
@@ -411,7 +421,28 @@ void MainWindow::applyValue(const CameraControlValue &value, const bool reportFa
         return;
     }
     CameraControlValue accepted;
-    if (!backend_->setControl(value, &accepted, &error)) {
+    bool applied = false;
+#ifdef Q_OS_WIN
+    const bool rotation = value.id == QLatin1String(WindowsCameraRotation::controlId);
+    if (rotation && !value.automatic) {
+        applied = WindowsCameraRotation::writeWithElevation(selectedDeviceId_, value.value, &error);
+        accepted = {value.id, value.value, false};
+    } else
+#endif
+    {
+        applied = backend_->setControl(value, &accepted, &error);
+    }
+    if (!applied) {
+#ifdef Q_OS_WIN
+        if (rotation) {
+            qint64 actual = 0;
+            if (WindowsCameraRotation::read(selectedDeviceId_, &actual)) {
+                for (auto *row : std::as_const(controlRows_)) {
+                    if (row->currentValue().id == value.id) row->setCurrentValue(actual, false, false);
+                }
+            }
+        }
+#endif
         if (reportFailure) {
             setStatus(error, true);
         }
@@ -425,6 +456,17 @@ void MainWindow::applyValue(const CameraControlValue &value, const bool reportFa
         name = (*row)->controlName();
         (*row)->setCurrentValue(accepted.value, accepted.automatic, false);
     }
+#ifdef Q_OS_WIN
+    if (rotation) {
+        if (camera_) {
+            camera_->stop();
+            camera_->start();
+        }
+        setStatus(tr("Video rotation saved. Turn the camera off and on in Google Meet or other apps. "
+                     "Reconnect the webcam if the change is not visible yet."));
+        return;
+    }
+#endif
     setStatus(tr("Applied %1: %2%3")
                   .arg(name)
                   .arg(accepted.value)
