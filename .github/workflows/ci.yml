@@ -63,7 +63,7 @@ jobs:
         run: cmake --build build --config Release --parallel
 
       - name: Test portable core
-        run: ctest --test-dir build -C Release --output-on-failure -R "profile-store-tests|windows-camera-rotation-tests"
+        run: ctest --test-dir build -C Release --output-on-failure -R "profile-store-tests|camera-usage-tests|windows-camera-rotation-tests|windows-camera-rotation-tests"
 
       - name: Test CLI startup
         if: runner.os != 'Windows'

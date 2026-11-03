@@ -68,7 +68,7 @@ jobs:
         run: cmake --build build --config Release --parallel
 
       - name: Test portable core
-        run: ctest --test-dir build -C Release --output-on-failure -R profile-store-tests
+        run: ctest --test-dir build -C Release --output-on-failure -R "profile-store-tests|camera-usage-tests|windows-camera-rotation-tests"
 
       - name: Install portable application
         run: cmake --install build --config Release --prefix "${{ github.workspace }}/package"
@@ -103,6 +103,9 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Check out release source
+        uses: actions/checkout@v7
+
       - name: Download packages
         uses: actions/download-artifact@v8
         with:
@@ -118,4 +121,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
-        run: gh release create "$GITHUB_REF_NAME" release-assets/* --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes --title "Webcam Settings $GITHUB_REF_NAME"
+        run: |
+          awk -v version="${GITHUB_REF_NAME#v}" '
+            $1 == "##" { if (found) exit; found = ($2 == version); next }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          test -s release-notes.md
+          gh release create "$GITHUB_REF_NAME" release-assets/* --repo "$GITHUB_REPOSITORY" --verify-tag --notes-file release-notes.md --title "Webcam Settings $GITHUB_REF_NAME"

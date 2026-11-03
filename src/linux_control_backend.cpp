@@ -240,10 +240,8 @@ public:
                             menu.id = currentId;
                             menu.index = static_cast<quint32>(index);
                             if (xioctl(descriptor_, VIDIOC_QUERYMENU, &menu) == 0) {
-                                const qint64 value = query.type == V4L2_CTRL_TYPE_INTEGER_MENU
-                                    ? menu.value : index;
                                 control.options.push_back({
-                                    value,
+                                    index, // Both menu types are set using the item index.
                                     query.type == V4L2_CTRL_TYPE_INTEGER_MENU
                                         ? QString::number(menu.value)
                                         : QString::fromUtf8(reinterpret_cast<const char *>(menu.name)),

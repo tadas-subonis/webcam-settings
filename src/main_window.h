@@ -42,7 +42,6 @@ private:
     void loadProfile();
     void refreshCameraUsers();
     void terminateSelectedCameraUser();
-    void restoreLastCamera();
     void setStatus(const QString &message, bool error = false);
     [[nodiscard]] QVector<CameraControlValue> currentValues() const;
 

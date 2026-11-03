@@ -1,6 +1,7 @@
 #include "camera_usage.h"
 
 #include <QCoreApplication>
+
 #include <QDir>
 #include <QFileInfo>
 #include <QSet>
@@ -10,6 +11,7 @@
 
 #include <algorithm>
 #include <memory>
+#include <limits>
 
 namespace {
 struct RegistryCloser {
@@ -156,7 +158,8 @@ bool CameraUsageInspector::terminate(const qint64 pid, QString *error)
     if (error) {
         error->clear();
     }
-    if (pid <= 0 || pid == QCoreApplication::applicationPid()) {
+    if (pid <= 0 || pid > std::numeric_limits<DWORD>::max()
+        || pid == QCoreApplication::applicationPid()) {
         if (error) {
             *error = QStringLiteral("Refusing to terminate an invalid or current-process PID.");
         }

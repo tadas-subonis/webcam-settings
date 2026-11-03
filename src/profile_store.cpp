@@ -5,6 +5,9 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSaveFile>
+#include <QSet>
+
+#include <limits>
 
 namespace {
 void setError(QString *target, const QString &message)
@@ -80,20 +83,27 @@ bool ProfileStore::load(const QString &path,
     }
 
     QVector<CameraControlValue> parsed;
+    QSet<QString> seen;
     for (const auto &item : root.value(QStringLiteral("controls")).toArray()) {
         if (!item.isObject()) {
-            continue;
+            setError(error, QStringLiteral("Invalid profile control entry."));
+            return false;
         }
         const auto object = item.toObject();
         const QString id = normalizedControlId(object.value(QStringLiteral("control")).toString());
-        if (id.isEmpty() || !object.value(QStringLiteral("value")).isDouble()) {
-            continue;
+        const auto number = object.value(QStringLiteral("value"));
+        const auto automatic = object.value(QStringLiteral("auto"));
+        // Different fallbacks distinguish invalid/fractional numbers from every
+        // valid qint64, including its minimum and maximum values.
+        const qint64 value = number.toInteger(std::numeric_limits<qint64>::min());
+        if (id.isEmpty() || seen.contains(id) || !number.isDouble()
+            || value != number.toInteger(std::numeric_limits<qint64>::max())
+            || (!automatic.isUndefined() && !automatic.isBool())) {
+            setError(error, QStringLiteral("Invalid or duplicate profile control: %1.").arg(id));
+            return false;
         }
-        parsed.push_back({
-            id,
-            object.value(QStringLiteral("value")).toInteger(),
-            object.value(QStringLiteral("auto")).toBool(false),
-        });
+        seen.insert(id);
+        parsed.push_back({id, value, automatic.toBool(false)});
     }
 
     if (parsed.isEmpty()) {

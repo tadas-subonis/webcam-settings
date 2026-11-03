@@ -56,7 +56,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(&mediaDevices_, &QMediaDevices::videoInputsChanged, this, [this] { refreshDevices(); });
     refreshDevices();
-    restoreLastCamera();
 }
 
 MainWindow::~MainWindow()
@@ -184,7 +183,11 @@ void MainWindow::buildUi()
 
 void MainWindow::refreshDevices()
 {
-    const QByteArray selectedId = deviceCombo_->currentData().toByteArray();
+    QByteArray selectedId = deviceCombo_->currentData().toByteArray();
+    if (selectedId.isEmpty()) {
+        QSettings settings(QString::fromLatin1(kSettingsOrganization), QString::fromLatin1(kSettingsApplication));
+        selectedId = settings.value(QStringLiteral("lastDeviceId")).toByteArray();
+    }
     refreshing_ = true;
     deviceCombo_->clear();
 
@@ -552,21 +555,6 @@ void MainWindow::loadProfile()
         }
     }
     setStatus(tr("Loaded %1 settings from %2").arg(applied).arg(path));
-}
-
-void MainWindow::restoreLastCamera()
-{
-    QSettings settings(QString::fromLatin1(kSettingsOrganization), QString::fromLatin1(kSettingsApplication));
-    const QByteArray lastId = settings.value(QStringLiteral("lastDeviceId")).toByteArray();
-    if (lastId.isEmpty()) {
-        return;
-    }
-    for (int i = 0; i < deviceCombo_->count(); ++i) {
-        if (deviceCombo_->itemData(i).toByteArray() == lastId) {
-            deviceCombo_->setCurrentIndex(i);
-            return;
-        }
-    }
 }
 
 void MainWindow::setStatus(const QString &message, const bool error)

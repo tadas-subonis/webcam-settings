@@ -3,6 +3,7 @@
 #include <QFile>
 #include <QTemporaryDir>
 #include <QtTest>
+#include <limits>
 
 class ProfileStoreTests final : public QObject {
     Q_OBJECT
@@ -47,6 +48,55 @@ private slots:
         QString error;
         QVERIFY(!ProfileStore::load(path, &loaded, nullptr, &error));
         QVERIFY(!error.isEmpty());
+    }
+
+    void rejectsInvalidControlEntries_data()
+    {
+        QTest::addColumn<QByteArray>("entries");
+        QTest::newRow("fractional") << QByteArray(R"({"control":"zoom","value":1.5})");
+        QTest::newRow("overflow") << QByteArray(R"({"control":"zoom","value":1e30})");
+        QTest::newRow("string") << QByteArray(R"({"control":"zoom","value":"100"})");
+        QTest::newRow("invalid-auto") << QByteArray(R"({"control":"zoom","value":100,"auto":"false"})");
+        QTest::newRow("non-object") << QByteArray("42");
+        QTest::newRow("duplicate") << QByteArray(R"({"control":"focus","value":2})");
+    }
+
+    void rejectsInvalidControlEntries()
+    {
+        QFETCH(QByteArray, entries);
+        QTemporaryDir directory;
+        const QString path = directory.filePath(QStringLiteral("invalid.json"));
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write(R"({"formatVersion":1,"controls":[{"control":"focus","value":1},)"
+                   + entries + "]}");
+        file.close();
+        QVector<CameraControlValue> loaded{{QStringLiteral("existing"), 7, false}};
+        QString deviceName = QStringLiteral("unchanged");
+        QString error;
+        QVERIFY(!ProfileStore::load(path, &loaded, &deviceName, &error));
+        QVERIFY(!error.isEmpty());
+        QCOMPARE(loaded.size(), 1);
+        QCOMPARE(loaded.first().id, QStringLiteral("existing"));
+        QCOMPARE(deviceName, QStringLiteral("unchanged"));
+    }
+
+    void roundTripsIntegerLimits()
+    {
+        QTemporaryDir directory;
+        const QString path = directory.filePath(QStringLiteral("wide.json"));
+        const QVector<CameraControlValue> source{
+            {QStringLiteral("minimum"), std::numeric_limits<qint64>::min(), false},
+            {QStringLiteral("maximum"), std::numeric_limits<qint64>::max(), true},
+        };
+        QString error;
+        QVERIFY(ProfileStore::save(path, {}, {}, source, &error));
+        QVector<CameraControlValue> loaded;
+        QVERIFY2(ProfileStore::load(path, &loaded, nullptr, &error), qPrintable(error));
+        QCOMPARE(loaded.size(), 2);
+        QCOMPARE(loaded[0].value, source[0].value);
+        QCOMPARE(loaded[1].value, source[1].value);
+        QVERIFY(loaded[1].automatic);
     }
 
     void normalizesControlValues()
